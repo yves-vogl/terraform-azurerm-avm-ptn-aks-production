@@ -4,15 +4,12 @@ variable "location" {
   nullable    = false
 }
 
-variable "name" {
-  type        = string
-  description = "The name for the AKS resources created in the specified Azure Resource Group. This variable overwrites the 'prefix' var (The 'prefix' var will still be applied to the dns_prefix if it is set)"
+variable "naming_suffix" {
+  type = list(string)
 
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$", var.name))
-    error_message = "Check naming rules here https://learn.microsoft.com/en-us/rest/api/aks/managed-clusters/create-or-update?view=rest-aks-2023-10-01&tabs=HTTP"
-  }
+  description = "Suffix used for CAF naming module"
 }
+
 
 # This is required for most resource modules
 variable "resource_group_name" {
@@ -111,15 +108,6 @@ variable "zones" {
   description = "(Optional) Specifies a list of Availability Zones in which this Kubernetes Cluster Node Pool should be located. Changing this forces a new Kubernetes Cluster Node Pool to be created. Can be overwritten per node pool."
 }
 
-variable "node_resource_group" {
-  type        = string
-  default     = null
-  description = <<-EOT
-(Optional) The name of the Resource Group where the Kubernetes Nodes should exist. Changing this forces a new resource to be created.
-Azure requires that a new, non-existent Resource Group is used, as otherwise, the provisioning of the Kubernetes Service will fail.
-EOT
-}
-
 variable "node_pools" {
   type = map(object({
     name                 = string
@@ -198,6 +186,26 @@ variable "pod_cidr" {
   type        = string
   default     = null
   description = "(Optional) The CIDR to use for pod IPs in the Kubernetes cluster. Changing this forces a new resource to be created."
+}
+
+variable "service_cidr" {
+  type    = string
+  default = null
+}
+
+variable "dns_service_ip" {
+  type    = string
+  default = null
+}
+
+variable "network_policy" {
+  type    = string
+  default = "calico"
+}
+
+variable "network_plugin_mode" {
+  type    = string
+  default = "overlay"
 }
 
 variable "rbac_aad_admin_group_object_ids" {

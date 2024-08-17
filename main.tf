@@ -2,7 +2,7 @@ module "naming" {
   source  = "Azure/naming/azurerm"
   version = ">= 0.4"
 
-  suffix = [var.name]
+  suffix = var.naming_suffix
 }
 
 resource "azurerm_container_registry" "this" {
@@ -41,7 +41,7 @@ resource "azurerm_kubernetes_cluster" "this" {
   azure_policy_enabled              = true
   dns_prefix                        = module.naming.kubernetes_cluster.name_unique
   kubernetes_version                = var.kubernetes_version
-  node_resource_group               = var.node_resource_group
+  node_resource_group               = module.naming.resource_group.name_unique
   local_account_disabled            = false
   node_os_channel_upgrade           = "NodeImage"
   oidc_issuer_enabled               = true
@@ -104,9 +104,22 @@ resource "azurerm_kubernetes_cluster" "this" {
   network_profile {
     network_plugin      = "azure"
     load_balancer_sku   = "standard"
-    network_plugin_mode = "overlay"
-    network_policy      = "calico"
+    network_plugin_mode = var.network_plugin_mode
+    network_policy      = var.network_policy
     pod_cidr            = var.pod_cidr
+    service_cidr        = var.service_cidr
+
+    # dns_service_ip must be set when service_cidr is specified. 
+    # So either we take the last host address of this CIDR or the configured dns_service_ip
+    dns_service_ip = (
+      var.service_cidr != null
+      ? (
+        var.dns_service_ip != null
+        ? var.dns_service_ip
+        : cidrhost(var.service_cidr, -2)
+      )
+      : null
+    )
   }
 
   oms_agent {
@@ -160,7 +173,7 @@ resource "azapi_update_resource" "aks_cluster_post_create" {
 
 resource "azurerm_log_analytics_workspace" "this" {
   location            = var.location
-  name                = format("log-%s", var.name)
+  name                = module.naming.log_analytics_workspace.name_unique
   resource_group_name = var.resource_group_name
   sku                 = "PerGB2018"
   tags                = var.tags
