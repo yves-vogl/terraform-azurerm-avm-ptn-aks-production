@@ -37,10 +37,10 @@ locals {
   )
 
   node_pools = flatten([
-    for pool in var.node_pools : [
+    for pool_key, pool in var.node_pools : [
       for zone in local._zones : {
         # concatenate name and zone trim to 12 characters
-        name                 = "${substr(pool.name, 0, 10)}${zone}"
+        name                 = format("%s%s", substr(pool.name, 0, 10), zone)
         vm_size              = pool.vm_size
         orchestrator_version = pool.orchestrator_version
         max_count            = pool.max_count
@@ -48,10 +48,14 @@ locals {
         os_sku               = pool.os_sku
         zone                 = zone
       }
-    ]
+    ] if pool_key != "default"
   ])
-}
 
+  default_node_pool = var.node_pools.default
+
+
+
+}
 
 locals {
   log_analytics_tables = ["AKSAudit", "AKSAuditAdmin", "AKSControlPlane", "ContainerLogV2"]

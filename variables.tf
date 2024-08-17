@@ -39,8 +39,8 @@ DESCRIPTION
 
 variable "kubernetes_version" {
   type        = string
-  default     = null
-  description = "Specify which Kubernetes release to use. Specify only minor version, such as '1.28'."
+  default     = "1.30"
+  description = "Specify which Kubernetes release to use. Specify only minor version, such as '1.30'."
 }
 
 variable "lock" {
@@ -111,6 +111,15 @@ variable "zones" {
   description = "(Optional) Specifies a list of Availability Zones in which this Kubernetes Cluster Node Pool should be located. Changing this forces a new Kubernetes Cluster Node Pool to be created. Can be overwritten per node pool."
 }
 
+variable "node_resource_group" {
+  type        = string
+  default     = null
+  description = <<-EOT
+(Optional) The name of the Resource Group where the Kubernetes Nodes should exist. Changing this forces a new resource to be created.
+Azure requires that a new, non-existent Resource Group is used, as otherwise, the provisioning of the Kubernetes Service will fail.
+EOT
+}
+
 variable "node_pools" {
   type = map(object({
     name                 = string
@@ -125,7 +134,15 @@ variable "node_pools" {
     tags            = optional(map(string), {})
     zones           = optional(set(string))
   }))
-  default     = {}
+
+  default = {
+    default = {
+      name                 = "default"
+      vm_size              = "Standard_B2s"
+      orchestrator_version = "1.30" # NOTE: Could be optional and derived from var.kubernetes_version / var.orchestrator_version if not specified
+    }
+  }
+
   description = <<-EOT
 A map of node pools that need to be created and attached on the Kubernetes cluster. The key of the map can be the name of the node pool, and the key must be static string. The value of the map is a `node_pool` block as defined below:
 map(object({
@@ -140,6 +157,8 @@ map(object({
   tags                 = (Optional) A mapping of tags to assign to the resource. At this time there's a bug in the AKS API where Tags for a Node Pool are not stored in the correct case - you [may wish to use Terraform's `ignore_changes` functionality to ignore changes to the casing](https://www.terraform.io/language/meta-arguments/lifecycle#ignore_changess) until this is fixed in the AKS API.
   zones                = (Optional) Specifies a list of Availability Zones in which this Kubernetes Cluster Node Pool should be located. Changing this forces a new Kubernetes Cluster Node Pool to be created.
 }))
+
+You must specify a default node pool by using the key "default".
 
 Example input:
 ```terraform
@@ -168,10 +187,11 @@ EOT
   nullable    = false
 }
 
+
 variable "orchestrator_version" {
   type        = string
   default     = null
-  description = "Specify which Kubernetes release to use. Specify only minor version, such as '1.28'."
+  description = "Specify which Kubernetes release to use. Specify only minor version, such as '1.30'."
 }
 
 variable "pod_cidr" {
@@ -196,6 +216,16 @@ variable "rbac_aad_tenant_id" {
   type        = string
   default     = null
   description = "(Optional) The Tenant ID used for Azure Active Directory Application. If this isn't specified the Tenant ID of the current Subscription is used."
+}
+
+variable "create_container_registry" {
+  type    = bool
+  default = true
+}
+
+variable "acr_sku" {
+  type    = string
+  default = "Premium"
 }
 
 # tflint-ignore: terraform_unused_declarations

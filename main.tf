@@ -1,21 +1,25 @@
+module "naming" {
+  source  = "Azure/naming/azurerm"
+  version = ">= 0.4"
 
-resource "random_string" "acr_suffix" {
-  length  = 8
-  numeric = true
-  special = false
-  upper   = false
+  suffix = [var.name]
 }
 
 resource "azurerm_container_registry" "this" {
+  count = var.create_container_registry ? 1 : 0
+
   location            = var.location
-  name                = "cr${random_string.acr_suffix.result}"
+  name                = module.naming.container_registry.name_unique
   resource_group_name = var.resource_group_name
-  sku                 = "Premium"
+  sku                 = var.acr_sku
   tags                = var.tags
 }
+
 resource "azurerm_role_assignment" "acr" {
+  count = var.create_container_registry ? 1 : 0
+
   principal_id                     = azurerm_kubernetes_cluster.this.kubelet_identity[0].object_id
-  scope                            = azurerm_container_registry.this.id
+  scope                            = azurerm_container_registry.this[0].id
   role_definition_name             = "AcrPull"
   skip_service_principal_aad_check = true
 }
@@ -24,19 +28,20 @@ resource "azurerm_user_assigned_identity" "aks" {
   count = length(var.managed_identities.user_assigned_resource_ids) > 0 ? 0 : 1
 
   location            = var.location
-  name                = "uami-aks"
+  name                = module.naming.user_assigned_identity.name_unique
   resource_group_name = var.resource_group_name
   tags                = var.tags
 }
 
 resource "azurerm_kubernetes_cluster" "this" {
   location                          = var.location
-  name                              = "aks-${var.name}"
+  name                              = module.naming.kubernetes_cluster.name_unique
   resource_group_name               = var.resource_group_name
   automatic_channel_upgrade         = "patch"
   azure_policy_enabled              = true
-  dns_prefix                        = var.name
+  dns_prefix                        = module.naming.kubernetes_cluster.name_unique
   kubernetes_version                = var.kubernetes_version
+  node_resource_group               = var.node_resource_group
   local_account_disabled            = false
   node_os_channel_upgrade           = "NodeImage"
   oidc_issuer_enabled               = true
@@ -47,36 +52,37 @@ resource "azurerm_kubernetes_cluster" "this" {
   workload_identity_enabled         = true
 
   default_node_pool {
-    name                   = "agentpool"
-    vm_size                = "Standard_D4d_v5"
+
+    name                   = local.default_node_pool.name
+    vm_size                = local.default_node_pool.vm_size
     enable_auto_scaling    = true
     enable_host_encryption = true
-    max_count              = 9
+    min_count              = local.default_node_pool.min_count
+    max_count              = local.default_node_pool.max_count
     max_pods               = 110
-    min_count              = 3
-    orchestrator_version   = var.orchestrator_version
-    os_sku                 = "Ubuntu"
-    tags                   = merge(var.tags, var.agents_tags)
-    vnet_subnet_id         = local.vnet_subnet_id
-    zones = (
-      var.zones != null
-      ? var.zones
-      : try([for zone in local.regions_by_name_or_display_name[var.location].zones : zone], null)
-    )
+
+    orchestrator_version = local.default_node_pool.orchestrator_version
+    os_sku               = local.default_node_pool.os_sku
+    tags                 = merge(var.tags, var.agents_tags)
+    vnet_subnet_id       = local.vnet_subnet_id
+    zones                = local.default_node_pool.zones
 
     upgrade_settings {
       max_surge = "10%"
     }
   }
+
   auto_scaler_profile {
     balance_similar_node_groups = true
   }
+
   azure_active_directory_role_based_access_control {
     admin_group_object_ids = var.rbac_aad_admin_group_object_ids
     azure_rbac_enabled     = var.rbac_aad_azure_rbac_enabled
     managed                = true
     tenant_id              = var.rbac_aad_tenant_id
   }
+
   ## Resources that only support UserAssigned
   dynamic "identity" {
     for_each = local.managed_identities.user_assigned
@@ -85,13 +91,16 @@ resource "azurerm_kubernetes_cluster" "this" {
       identity_ids = identity.value.user_assigned_resource_ids
     }
   }
+
   key_vault_secrets_provider {
     secret_rotation_enabled = true
   }
+
   monitor_metrics {
     annotations_allowed = try(var.monitor_metrics.annotations_allowed, null)
     labels_allowed      = try(var.monitor_metrics.labels_allowed, null)
   }
+
   network_profile {
     network_plugin      = "azure"
     load_balancer_sku   = "standard"
@@ -99,6 +108,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     network_policy      = "calico"
     pod_cidr            = var.pod_cidr
   }
+
   oms_agent {
     log_analytics_workspace_id      = azurerm_log_analytics_workspace.this.id
     msi_auth_for_monitoring_enabled = true
@@ -139,6 +149,7 @@ resource "azapi_update_resource" "aks_cluster_post_create" {
       kubernetesVersion = var.kubernetes_version
     }
   })
+
   resource_id = azurerm_kubernetes_cluster.this.id
 
   lifecycle {
@@ -149,7 +160,7 @@ resource "azapi_update_resource" "aks_cluster_post_create" {
 
 resource "azurerm_log_analytics_workspace" "this" {
   location            = var.location
-  name                = "log-${var.name}-aks"
+  name                = format("log-%s", var.name)
   resource_group_name = var.resource_group_name
   sku                 = "PerGB2018"
   tags                = var.tags
@@ -164,7 +175,7 @@ resource "azurerm_log_analytics_workspace_table" "this" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "aks" {
-  name                           = "amds-${var.name}-aks"
+  name                           = module.naming.monitor_diagnostic_setting.name_unique
   target_resource_id             = azurerm_kubernetes_cluster.this.id
   log_analytics_destination_type = "Dedicated"
   log_analytics_workspace_id     = azurerm_log_analytics_workspace.this.id
@@ -231,7 +242,7 @@ resource "azurerm_management_lock" "this" {
 
 resource "azurerm_kubernetes_cluster_node_pool" "this" {
   for_each = tomap({
-    for pool in local.node_pools : pool.name => pool
+    for pool in local.node_pools : pool.name => pool if pool != "default"
   })
 
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
@@ -259,11 +270,11 @@ resource "azurerm_kubernetes_cluster_node_pool" "this" {
 
 # These resources allow the use of consistent local data files, and semver versioning
 data "local_file" "compute_provider" {
-  filename = "${path.module}/data/microsoft.compute_resourceTypes.json"
+  filename = format("%s/data/microsoft.compute_resourceTypes.json", path.module)
 }
 
 data "local_file" "locations" {
-  filename = "${path.module}/data/locations.json"
+  filename = format("%s/data/locations.json", path.module)
 }
 
 moved {
@@ -279,7 +290,7 @@ module "avm_res_network_virtualnetwork" {
 
   address_space       = var.node_cidr != null ? [var.node_cidr] : ["10.31.0.0/16"]
   location            = var.location
-  name                = var.virtual_network_name
+  name                = module.naming.virtual_network.name_unique
   resource_group_name = var.resource_group_name
   subnets = {
     "subnet" = {
