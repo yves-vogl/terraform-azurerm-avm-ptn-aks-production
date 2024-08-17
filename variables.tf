@@ -228,6 +228,11 @@ variable "acr_sku" {
   default = "Premium"
 }
 
+variable "enable_host_encryption" {
+  type    = bool
+  default = true
+}
+
 # tflint-ignore: terraform_unused_declarations
 variable "tags" {
   type        = map(string)

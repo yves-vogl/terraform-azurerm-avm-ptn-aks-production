@@ -56,7 +56,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     name                   = local.default_node_pool.name
     vm_size                = local.default_node_pool.vm_size
     enable_auto_scaling    = true
-    enable_host_encryption = true
+    enable_host_encryption = var.enable_host_encryption
     min_count              = local.default_node_pool.min_count
     max_count              = local.default_node_pool.max_count
     max_pods               = 110
