@@ -2,7 +2,7 @@ module "naming" {
   source  = "Azure/naming/azurerm"
   version = ">= 0.4"
 
-  suffix = var.naming_suffix
+  suffix = distinct(concat(var.naming_suffix, ["aks"]))
 }
 
 resource "azurerm_container_registry" "this" {
