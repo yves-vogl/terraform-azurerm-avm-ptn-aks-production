@@ -53,8 +53,11 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   default_node_pool {
 
-    name                   = local.default_node_pool.name
-    vm_size                = local.default_node_pool.vm_size
+    name    = local.default_node_pool.name
+    vm_size = local.default_node_pool.vm_size
+
+    temporary_name_for_rotation = format("%s0", local.default_node_pool.name)
+
     enable_auto_scaling    = true
     enable_host_encryption = var.enable_host_encryption
     min_count              = local.default_node_pool.min_count
@@ -66,7 +69,7 @@ resource "azurerm_kubernetes_cluster" "this" {
         can(cidrnetmask(local.vnet_subnet.resource.body.properties.addressPrefixes[0]))
         ? 32  # IPv4
         : 128 # IPv6
-    ) - tonumber(split("/", local.vnet_subnet.resource.body.properties.addressPrefixes[0])[1])) - 5) / local.default_node_pool.min_count)
+    ) - tonumber(split("/", local.vnet_subnet.resource.body.properties.addressPrefixes[0])[1])) - 5) / local.default_node_pool.max_count)
 
     orchestrator_version = local.default_node_pool.orchestrator_version
     os_sku               = local.default_node_pool.os_sku
