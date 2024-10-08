@@ -60,13 +60,13 @@ resource "azurerm_kubernetes_cluster" "this" {
     min_count              = local.default_node_pool.min_count
     max_count              = local.default_node_pool.max_count
 
-    # (Number of IP addresses in subnet - 3 reserved addresses) / Minimum Host Count
-    max_pods = pow(2,
+    # https://learn.microsoft.com/en-us/azure/aks/use-system-pools?tabs=azure-cli#system-and-user-node-pools
+    max_pods = floor((pow(2,
       (
         can(cidrnetmask(local.vnet_subnet.resource.body.properties.addressPrefixes[0]))
         ? 32  # IPv4
         : 128 # IPv6
-    ) - tonumber(split("/", local.vnet_subnet.resource.body.properties.addressPrefixes[0])[1])) - 3
+    ) - tonumber(split("/", local.vnet_subnet.resource.body.properties.addressPrefixes[0])[1])) - 5) / local.default_node_pool.min_count)
 
     orchestrator_version = local.default_node_pool.orchestrator_version
     os_sku               = local.default_node_pool.os_sku
