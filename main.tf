@@ -59,12 +59,19 @@ resource "azurerm_kubernetes_cluster" "this" {
     enable_host_encryption = var.enable_host_encryption
     min_count              = local.default_node_pool.min_count
     max_count              = local.default_node_pool.max_count
-    max_pods               = 110
+
+    # (Number of IP addresses in subnet - 3 reserved addresses) / Minimum Host Count
+    max_pods = pow(2,
+      (
+        can(cidrnetmask(local.vnet_subnet.resource.body.properties.addressPrefixes[0]))
+        ? 32  # IPv4
+        : 128 # IPv6
+    ) - tonumber(split("/", local.vnet_subnet.resource.body.properties.addressPrefixes[0])[1])) - 3
 
     orchestrator_version = local.default_node_pool.orchestrator_version
     os_sku               = local.default_node_pool.os_sku
     tags                 = merge(var.tags, var.agents_tags)
-    vnet_subnet_id       = local.vnet_subnet_id
+    vnet_subnet_id       = local.vnet_subnet.resource_id
     zones                = local.default_node_pool.zones
 
     upgrade_settings {
@@ -267,7 +274,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "this" {
   orchestrator_version  = each.value.orchestrator_version
   os_sku                = each.value.os_sku
   tags                  = var.tags
-  vnet_subnet_id        = local.vnet_subnet_id
+  vnet_subnet_id        = local.vnet_subnet.resource_id
   zones                 = each.value.zone == "" ? null : [each.value.zone]
 
   depends_on = [azapi_update_resource.aks_cluster_post_create]
@@ -312,5 +319,3 @@ module "avm_res_network_virtualnetwork" {
     }
   }
 }
-
-
