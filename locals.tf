@@ -92,6 +92,9 @@ locals {
 }
 
 locals {
+
+  default_max_pods = (var.pod_subnet != null ? 250 : 30)
+
   max_pods = floor(
     (
       # Number of addresses in subnet

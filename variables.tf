@@ -219,6 +219,11 @@ variable "network_plugin_mode" {
   default = "overlay"
 }
 
+variable "authorized_ip_ranges" {
+  type    = list(string)
+  default = null
+}
+
 variable "rbac_aad_admin_group_object_ids" {
   type        = list(string)
   default     = null

@@ -66,7 +66,7 @@ resource "azurerm_kubernetes_cluster" "this" {
 
     # https://learn.microsoft.com/en-us/azure/aks/use-system-pools?tabs=azure-cli#system-and-user-node-pools
 
-    max_pods = local.max_pods >= 30 ? local.max_pods : 30
+    max_pods = local.max_pods >= local.default_max_pods ? local.max_pods : local.default_max_pods
 
     orchestrator_version = local.default_node_pool.orchestrator_version
     os_sku               = local.default_node_pool.os_sku
@@ -87,8 +87,10 @@ resource "azurerm_kubernetes_cluster" "this" {
   azure_active_directory_role_based_access_control {
     admin_group_object_ids = var.rbac_aad_admin_group_object_ids
     azure_rbac_enabled     = var.rbac_aad_azure_rbac_enabled
-    managed                = true
-    tenant_id              = var.rbac_aad_tenant_id
+    # Azure AD Integration (legacy) (https://aka.ms/aks/aad-legacy) is deprecated and clusters can no longer be created with the Azure AD integration (legacy) enabled. 
+    # This field must be supplied with the value `true` for AKS-managed Entra Integration, but will be removed and defaulted to `true` for the user in v4.0 of the AzureRM Provider.
+    managed   = true
+    tenant_id = var.rbac_aad_tenant_id
   }
 
   ## Resources that only support UserAssigned
@@ -130,6 +132,10 @@ resource "azurerm_kubernetes_cluster" "this" {
     )
   }
 
+  api_server_access_profile {
+    authorized_ip_ranges = var.authorized_ip_ranges
+  }
+
   oms_agent {
     log_analytics_workspace_id      = azurerm_log_analytics_workspace.this.id
     msi_auth_for_monitoring_enabled = true
@@ -157,27 +163,27 @@ resource "azurerm_kubernetes_cluster" "this" {
 # The kubernetes_version_keeper and aks_cluster_post_create resources implement a mechanism to force the update
 # when the minor kubernetes version changes in var.kubernetes_version
 
-resource "null_resource" "kubernetes_version_keeper" {
-  triggers = {
-    version = var.kubernetes_version
-  }
-}
+# resource "null_resource" "kubernetes_version_keeper" {
+#   triggers = {
+#     version = var.kubernetes_version
+#   }
+# }
 
-resource "azapi_update_resource" "aks_cluster_post_create" {
-  type = "Microsoft.ContainerService/managedClusters@2024-02-01"
-  body = jsonencode({
-    properties = {
-      kubernetesVersion = var.kubernetes_version
-    }
-  })
+# resource "azapi_update_resource" "aks_cluster_post_create" {
+#   type = "Microsoft.ContainerService/managedClusters@2024-02-01"
+#   body = jsonencode({
+#     properties = {
+#       kubernetesVersion = var.kubernetes_version
+#     }
+#   })
 
-  resource_id = azurerm_kubernetes_cluster.this.id
+#   resource_id = azurerm_kubernetes_cluster.this.id
 
-  lifecycle {
-    ignore_changes       = all
-    replace_triggered_by = [null_resource.kubernetes_version_keeper.id]
-  }
-}
+#   lifecycle {
+#     ignore_changes       = all
+#     replace_triggered_by = [null_resource.kubernetes_version_keeper.id]
+#   }
+# }
 
 resource "azurerm_log_analytics_workspace" "this" {
   location            = var.location
@@ -279,7 +285,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "this" {
   pod_subnet_id         = var.pod_subnet.resource_id
   zones                 = each.value.zone == "" ? null : [each.value.zone]
 
-  depends_on = [azapi_update_resource.aks_cluster_post_create]
+  #depends_on = [azapi_update_resource.aks_cluster_post_create]
 
   lifecycle {
     precondition {
