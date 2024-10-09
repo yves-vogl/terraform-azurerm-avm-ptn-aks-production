@@ -104,6 +104,15 @@ variable "node_subnet" {
   description = "(Optional) The resource id of the existing subnet to use for node IPs in the Kubernetes cluster. Changing this forces a new resource to be created."
 }
 
+variable "pod_subnet" {
+  type = object({
+    resource_id = string
+    resource    = any
+  })
+  default     = null
+  description = "(Optional) The resource id of the existing subnet to use for Pod IPs in the Kubernetes cluster."
+}
+
 variable "zones" {
   type        = list(number)
   default     = null

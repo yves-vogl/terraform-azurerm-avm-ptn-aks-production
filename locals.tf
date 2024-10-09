@@ -90,3 +90,24 @@ locals {
 
 
 }
+
+locals {
+  max_pods = floor(
+    (
+      # Number of addresses in subnet
+      pow(2,
+        (
+          can(cidrnetmask(local.vnet_subnet.resource.body.properties.addressPrefixes[0]))
+          ? 32  # IPv4
+          : 128 # IPv6
+        )
+        -tonumber(
+          split("/", local.vnet_subnet.resource.body.properties.addressPrefixes[0])[1]
+        )
+
+      )
+      -5                                  # 5 addresses are reserved by Azure
+      -local.default_node_pool.max_count  # Host addresses
+    ) / local.default_node_pool.min_count # Divide by the minimum number of nodes
+  )
+}
