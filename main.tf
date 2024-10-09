@@ -132,9 +132,15 @@ resource "azurerm_kubernetes_cluster" "this" {
     )
   }
 
-  api_server_access_profile {
-    authorized_ip_ranges = var.authorized_ip_ranges
+  dynamic "api_server_access_profile" {
+
+    for_each = var.authorized_ip_ranges != null ? [true] : []
+
+    content {
+      authorized_ip_ranges = var.authorized_ip_ranges
+    }
   }
+
 
   oms_agent {
     log_analytics_workspace_id      = azurerm_log_analytics_workspace.this.id
