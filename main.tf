@@ -46,6 +46,7 @@ resource "azurerm_kubernetes_cluster" "this" {
   node_os_channel_upgrade           = "NodeImage"
   oidc_issuer_enabled               = true
   private_cluster_enabled           = true
+  private_dns_zone_id               = var.private_dns_zone_id
   role_based_access_control_enabled = true
   sku_tier                          = "Standard"
   tags                              = var.tags
@@ -311,11 +312,6 @@ data "local_file" "locations" {
   filename = format("%s/data/locations.json", path.module)
 }
 
-moved {
-  from = module.vnet
-  to   = module.avm_res_network_virtualnetwork
-}
-
 module "avm_res_network_virtualnetwork" {
   source  = "Azure/avm-res-network-virtualnetwork/azurerm"
   version = "0.2.3"
@@ -333,3 +329,27 @@ module "avm_res_network_virtualnetwork" {
     }
   }
 }
+
+# module "avm-ptn-network-private-link-private-dns-zones" {
+#   source  = "Azure/avm-ptn-network-private-link-private-dns-zones/azurerm"
+#   version = "~> 0.4"
+
+#   location            = var.location
+#   resource_group_name = var.resource_group_name
+
+#   resource_group_creation_enabled = false
+#   lock                            = var.lock
+
+#   virtual_network_resource_ids_to_link_to = [
+#     local.vnet_subnet.resource_id,
+#     #var.pod_subnet.resource_id # Check if necessary for management pods
+#   ]
+
+#   enable_telemetry = var.enable_telemetry
+#   tags             = var.tags
+
+#   # private_link_private_dns_zones
+
+#   #"azure_aks_mgmt": { "zone_name": "privatelink.{regionName}.azmk8s.io" }
+# }
+

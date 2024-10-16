@@ -119,6 +119,11 @@ variable "zones" {
   description = "(Optional) Specifies a list of Availability Zones in which this Kubernetes Cluster Node Pool should be located. Changing this forces a new Kubernetes Cluster Node Pool to be created. Can be overwritten per node pool."
 }
 
+variable "private_dns_zone_id" {
+  type        = string
+  description = "DNS Zone ID to register private cluster"
+}
+
 variable "node_pools" {
   type = map(object({
     name                 = string
