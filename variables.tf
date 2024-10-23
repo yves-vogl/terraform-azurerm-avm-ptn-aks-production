@@ -113,6 +113,17 @@ variable "pod_subnet" {
   description = "(Optional) The resource id of the existing subnet to use for Pod IPs in the Kubernetes cluster."
 }
 
+variable "agw_subnet" {
+  type = object({
+    resource_id = string
+    resource    = any
+  })
+  default     = null
+  description = "(Optional) The resource id of the existing subnet to use for the Application Gateway."
+}
+
+# NOTE: Maybe add userAssignedNATGateway
+
 variable "zones" {
   type        = list(number)
   default     = null

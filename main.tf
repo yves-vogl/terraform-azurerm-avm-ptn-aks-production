@@ -76,6 +76,18 @@ resource "azurerm_kubernetes_cluster" "this" {
     pod_subnet_id        = var.pod_subnet.resource_id
     zones                = local.default_node_pool.zones
 
+    # Disabled temporarly because of:
+    #     │ Error: creating temporary Agent Pool (Subscription: "36107e48-ba9b-4ac5-b5aa-1158b497b620"
+    # │ Resource Group Name: "rg-admatch-platform-zeff"
+    # │ Managed Cluster Name: "aks-admatch-aks-bvge"
+    # │ Agent Pool Name: "default0"): performing CreateOrUpdate: unexpected status 400 (400 Bad Request) with response: {
+    # │   "code": "ErrCode_InsufficientVCPUQuota",
+    # │   "details": null,
+    # │   "message": "Insufficient regional vcpu quota left for location germanywestcentral. left regional vcpu quota 2, requested quota 6",
+    # │   "subcode": ""
+    # │  }
+    #only_critical_addons_enabled = length(local.node_pools) > 0
+
     upgrade_settings {
       max_surge = "10%"
     }
@@ -146,6 +158,15 @@ resource "azurerm_kubernetes_cluster" "this" {
   oms_agent {
     log_analytics_workspace_id      = azurerm_log_analytics_workspace.this.id
     msi_auth_for_monitoring_enabled = true
+  }
+
+  dynamic "ingress_application_gateway" {
+
+    for_each = var.agw_subnet != null ? [true] : []
+
+    content {
+      subnet_id = var.agw_subnet.resource_id
+    }
   }
 
   lifecycle {
@@ -272,7 +293,6 @@ resource "azurerm_management_lock" "this" {
   scope      = azurerm_kubernetes_cluster.this.id
   notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
 }
-
 
 resource "azurerm_kubernetes_cluster_node_pool" "this" {
   for_each = tomap({
